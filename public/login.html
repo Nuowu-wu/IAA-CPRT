@@ -347,36 +347,52 @@
         // 表单处理
         document.getElementById('loginForm').addEventListener('submit', async (event) => {
             event.preventDefault();
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
+            
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+            
+            if (!username || !password) {
+                const errorDiv = document.getElementById('error-message');
+                errorDiv.textContent = '[ERROR::EMPTY_CREDENTIALS]';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            const errorDiv = document.getElementById('error-message');
+            const successDiv = document.getElementById('success-message');
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
             
             try {
+                console.log('Attempting login with:', { username }); // 不记录密码
                 const response = await fetch('/api/auth', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
                     },
                     body: JSON.stringify({ username, password })
                 });
 
-                if (response.ok) {
+                const data = await response.json();
+                console.log('Login response:', data);
+
+                if (response.ok && data.status === 'success') {
                     // 保存认证信息
                     localStorage.setItem('auth', btoa(`${username}:${password}`));
                     // 显示成功消息
-                    document.getElementById('success-message').style.display = 'block';
-                    document.getElementById('success-message').textContent = '[ACCESS::GRANTED]';
+                    successDiv.textContent = '[ACCESS::GRANTED]';
+                    successDiv.style.display = 'block';
                     // 延迟跳转到监控页面
                     setTimeout(() => {
                         window.location.href = '/monitor';
                     }, 1000);
                 } else {
-                    const errorDiv = document.getElementById('error-message');
-                    errorDiv.textContent = '[ACCESS::DENIED] - INVALID CREDENTIALS';
+                    errorDiv.textContent = data.message || '[ACCESS::DENIED] - INVALID CREDENTIALS';
                     errorDiv.style.display = 'block';
                 }
             } catch (error) {
                 console.error('Login error:', error);
-                const errorDiv = document.getElementById('error-message');
                 errorDiv.textContent = '[SYSTEM::ERROR] - PLEASE TRY AGAIN';
                 errorDiv.style.display = 'block';
             }
