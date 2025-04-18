@@ -266,7 +266,7 @@
         </div>
 
         <div class="access-form">
-            <form id="loginForm" onsubmit="handleLogin(event)">
+            <form id="loginForm">
                 <div class="form-group">
                     <label for="username">[USERNAME]</label>
                     <input type="text" id="username" placeholder="ENTER USERNAME" required>
@@ -276,8 +276,8 @@
                     <input type="password" id="password" placeholder="ENTER PASSWORD" required>
                 </div>
                 <button type="submit" class="submit-btn">[ACCESS::SYSTEM]</button>
-                <div class="error-message" id="error-message">[ERROR::INVALID_CREDENTIALS]</div>
-                <div class="success-message" id="success-message">[ACCESS::GRANTED]</div>
+                <div class="error-message" id="error-message"></div>
+                <div class="success-message" id="success-message"></div>
             </form>
         </div>
 
@@ -345,7 +345,7 @@
         matrixRain.animate();
 
         // 表单处理
-        async function handleLogin(event) {
+        document.getElementById('loginForm').addEventListener('submit', async (event) => {
             event.preventDefault();
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
@@ -362,24 +362,25 @@
                 if (response.ok) {
                     // 保存认证信息
                     localStorage.setItem('auth', btoa(`${username}:${password}`));
-                    // 跳转到监控页面
-                    window.location.href = '/monitor';
+                    // 显示成功消息
+                    document.getElementById('success-message').style.display = 'block';
+                    document.getElementById('success-message').textContent = '[ACCESS::GRANTED]';
+                    // 延迟跳转到监控页面
+                    setTimeout(() => {
+                        window.location.href = '/monitor';
+                    }, 1000);
                 } else {
-                    showError('访问被拒绝：认证失败');
+                    const errorDiv = document.getElementById('error-message');
+                    errorDiv.textContent = '[ACCESS::DENIED] - INVALID CREDENTIALS';
+                    errorDiv.style.display = 'block';
                 }
             } catch (error) {
                 console.error('Login error:', error);
-                showError('系统错误：请稍后重试');
-            }
-        }
-
-        function showError(message) {
-            const errorDiv = document.getElementById('error-message');
-            if (errorDiv) {
-                errorDiv.textContent = message;
+                const errorDiv = document.getElementById('error-message');
+                errorDiv.textContent = '[SYSTEM::ERROR] - PLEASE TRY AGAIN';
                 errorDiv.style.display = 'block';
             }
-        }
+        });
 
         // 检查是否已经登录
         function checkAuth() {
