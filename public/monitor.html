@@ -426,6 +426,16 @@
     </div>
 
     <script>
+        // 检查认证状态
+        function checkAuth() {
+            const auth = localStorage.getItem('auth');
+            if (!auth) {
+                window.location.href = '/login.html';
+                return false;
+            }
+            return true;
+        }
+
         // Matrix雨效果
         class MatrixRain {
             constructor() {
@@ -480,6 +490,9 @@
 
         class MonitorUI {
             constructor() {
+                // 首先检查认证
+                if (!checkAuth()) return;
+                
                 this.lastUpdate = Date.now();
                 this.logHistory = [];
                 this.initialize();
@@ -531,14 +544,22 @@
 
             async refreshData() {
                 try {
+                    const auth = localStorage.getItem('auth');
+                    if (!auth) {
+                        localStorage.removeItem('auth');
+                        window.location.href = '/login.html';
+                        return;
+                    }
+
                     const response = await fetch('/api/monitor', {
                         headers: {
-                            'Authorization': 'Basic ' + btoa('kali:kali')
+                            'Authorization': 'Basic ' + auth
                         }
                     });
                     
                     if (!response.ok) {
                         if (response.status === 401) {
+                            localStorage.removeItem('auth');
                             window.location.href = '/login.html';
                             return;
                         }
@@ -546,7 +567,7 @@
                     }
                     
                     const devices = await response.json();
-                    if (devices.length > 0) {
+                    if (devices && devices.length > 0) {
                         this.updateDeviceInfo(devices[0]);
                         this.updateCameraFeed(devices[0]);
                         this.addLog('DATA::UPDATE::SUCCESS', 'info');
@@ -603,12 +624,21 @@
                 try {
                     const cameraFeed = document.getElementById('camera-feed');
                     const cameraStatus = document.getElementById('camera-status');
+                    const auth = localStorage.getItem('auth');
                     
                     if (device.lastImage) {
                         cameraFeed.src = `/api/camera-image/${device.location.ip}`;
                         cameraFeed.style.display = 'block';
                         cameraStatus.textContent = 'ONLINE';
                         cameraStatus.style.color = '#0f0';
+                        
+                        // 添加认证信息到图片请求
+                        cameraFeed.onerror = () => {
+                            cameraFeed.style.display = 'none';
+                            cameraStatus.textContent = 'OFFLINE';
+                            cameraStatus.style.color = '#f00';
+                            this.addLog('ERROR::CAMERA_FEED_FAILED', 'error');
+                        };
                     } else {
                         cameraFeed.style.display = 'none';
                         cameraStatus.textContent = 'OFFLINE';
@@ -648,7 +678,11 @@
         }
 
         // 初始化监控界面
-        const monitor = new MonitorUI();
+        window.addEventListener('load', () => {
+            if (checkAuth()) {
+                const monitor = new MonitorUI();
+            }
+        });
     </script>
 </body>
 </html> 
