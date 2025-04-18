@@ -533,11 +533,17 @@
                 try {
                     const response = await fetch('/api/monitor', {
                         headers: {
-                            'Authorization': 'Basic ' + btoa('admin:secret')
+                            'Authorization': 'Basic ' + btoa('kali:kali')
                         }
                     });
                     
-                    if (!response.ok) throw new Error('CONNECTION::FAILED');
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        throw new Error('CONNECTION::FAILED');
+                    }
                     
                     const devices = await response.json();
                     if (devices.length > 0) {
@@ -598,17 +604,19 @@
                     const cameraFeed = document.getElementById('camera-feed');
                     const cameraStatus = document.getElementById('camera-status');
                     
-                    if (device.lastImage && device.location?.ip) {
-                        cameraFeed.src = `/api/camera-image/${device.location.ip}?t=${Date.now()}`;
+                    if (device.lastImage) {
+                        cameraFeed.src = `/api/camera-image/${device.location.ip}`;
+                        cameraFeed.style.display = 'block';
                         cameraStatus.textContent = 'ONLINE';
-                        cameraFeed.parentElement.classList.remove('offline');
+                        cameraStatus.style.color = '#0f0';
                     } else {
+                        cameraFeed.style.display = 'none';
                         cameraStatus.textContent = 'OFFLINE';
-                        cameraFeed.parentElement.classList.add('offline');
+                        cameraStatus.style.color = '#f00';
                     }
                 } catch (error) {
-                    this.addLog('ERROR::UPDATE_CAMERA_FEED_FAILED', 'error');
                     console.error('Error updating camera feed:', error);
+                    this.addLog('ERROR::CAMERA_UPDATE_FAILED', 'error');
                 }
             }
 
