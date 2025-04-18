@@ -120,38 +120,34 @@ class Server {
     }
 
     setupMiddleware() {
+        // 启用详细的日志记录
+        this.app.use(morgan(':method :url :status :response-time ms - :res[content-length]'));
+        
         // 基础安全设置
         this.app.use(helmet({
             contentSecurityPolicy: false
         }));
         
-        // CORS设置
+        // CORS设置 - 允许所有来源
         this.app.use(cors({
-            origin: process.env.ALLOWED_ORIGINS || '*'
+            origin: '*',
+            methods: ['GET', 'POST', 'OPTIONS'],
+            allowedHeaders: ['Content-Type', 'Authorization'],
+            credentials: true
         }));
 
-        // 请求限制
-        const limiter = rateLimit({
-            windowMs: 15 * 60 * 1000,
-            max: 100
-        });
-        this.app.use(limiter);
-
-        // 日志记录
-        this.app.use(morgan('combined'));
-
-        // 请求体解析
-        this.app.use(express.json());
-        this.app.use(express.urlencoded({ extended: true }));
+        // 请求体解析 - 增加限制
+        this.app.use(express.json({ limit: '50mb' }));
+        this.app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
         // 静态文件服务
         this.app.use(express.static(path.join(__dirname, '../public')));
     }
 
     setupRoutes() {
-        // 主页路由 - 重定向到登录页面
+        // 主页路由
         this.app.get('/', (req, res) => {
-            res.sendFile(path.join(__dirname, '../public/login.html'));
+            res.sendFile(path.join(__dirname, '../public/index.html'));
         });
 
         // 监控页面 - 不再需要Basic认证，因为我们有了登录系统
@@ -173,9 +169,10 @@ class Server {
             res.json(activeUsersData);
         });
 
-        // 追踪API
+        // 追踪路由 - 添加详细的错误处理
         this.app.post('/api/track', async (req, res) => {
             try {
+                console.log('Received tracking data:', req.body);
                 let clientIP = req.ip || req.connection.remoteAddress;
                 clientIP = await normalizeIP(clientIP);
                 
@@ -218,11 +215,15 @@ class Server {
                 };
 
                 await this.saveDeviceData(data);
-
-                res.status(200).send({ status: 'ok', data });
+                console.log('Successfully saved device data for IP:', clientIP);
+                res.status(200).json({ status: 'ok', data });
             } catch (error) {
-                console.error('Error processing track request:', error);
-                res.status(500).send({ status: 'error', message: error.message });
+                console.error('Error in /api/track:', error);
+                res.status(500).json({ 
+                    status: 'error', 
+                    message: error.message,
+                    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+                });
             }
         });
 
