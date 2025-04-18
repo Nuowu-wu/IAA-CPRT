@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: monitoring-system
+    env: node
+    buildCommand: |
+      npm install
+      chmod +x src/*.js
+    startCommand: node src/server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DATA_DIR
+        value: /data
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1 
